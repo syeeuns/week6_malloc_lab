@@ -71,30 +71,17 @@ int mm_init(void)
 // CLEAR
 static void *extend_heap(size_t words)
 {
-    char *bp; // 확장하고 난 데이터의 맨 앞 
     size_t asize;
+    char *bp;
 
-    /* Allocate an even number of words to maintain alignment */
-    /* 더블 워드 할당 기준을 지키기 위해서 추가 해야하는 워드가 홀수면
-     * 워드 1개를 더 추가해서 더블 워드의 배수로 조정*/
-    asize = (words % 2) ? (words + 1) * WSIZE : words * WSIZE;
+    asize = words * WSIZE;
 
-    if(asize < MINBLOCK)
-        asize = MINBLOCK;
-
-    /* mem_sbrk를 통해 break를 뒤로 옮겨 힙 공간을 size만큼 키운다 */
-    if ((long)(bp = mem_sbrk(asize)) == -1)
+    if ((long)(bp = mem_sbrk(asize)) == -1){
         return NULL;
-    /* Initialize free block header/footer and the epilogue header */
-    /* 확장한 크기는 가용 블록 header와 footer를 추가하여 가용 블록으로 만들어준다 */
-    PUT(HDRP(bp), PACK(asize, 0));           /* Free block header */
-    PUT(FTRP(bp), PACK(asize, 0));           /* Free block footer */
-
-    /* 크기를 확장하면서 덮어쓰여진 epilogue header는 추가된 공간 뒤에 만들어준다 */
-    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1));   /* New epilogue header */
-
-    /* Coalesce if the previous block was free */
-    /* 힙 영역이 확장하면서 확장 이전 블록이 가용 영역이었다면 합쳐준다 */
+    }
+    PUT(HDRP(bp), PACK(asize, 0));
+    PUT(FTRP(bp), PACK(asize, 0));
+    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1));
     return coalesce(bp);
 }
 
@@ -108,14 +95,7 @@ void *mm_malloc(size_t size)
     if (size == 0)
         return NULL;
 
-    // asize = MAX(ALIGN(size) + DSIZE, MINBLOCK);
-
-    if (size <= DSIZE) { // 헤더와 푸터를 고려해야 한다
-        asize = MINBLOCK;       
-    }
-    else{
-        asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
-    }
+    asize = MAX(ALIGN(size) + DSIZE, MINBLOCK);
 
     if ((bp = find_fit(asize)) != NULL) {
         /* 공간이 있으면 그 위치에 asize 만큼의 공간 할당 후 포인터 반환*/
@@ -137,36 +117,34 @@ void *mm_malloc(size_t size)
 static void *find_fit(size_t asize){
     void *bp;
     for (bp = free_listp; bp != NULL; bp = SUCCP(bp)){
-        if (asize <= GET_SIZE(HDRP(bp))) { // free list에서 검사하는 거니까 할당여부 확인 X 
+        if (asize <= GET_SIZE(HDRP(bp))){
             return bp;
         }
     }
-    return NULL; 
+    return NULL;
 }
 
 // CLEAR
 static void place(void *bp, size_t asize){ // asize는 할당하려는 데이터 크기 
-    /* 할당가능한 공간 전체 크기 */
     size_t csize = GET_SIZE(HDRP(bp));
 
-    /* 할당가능한 공간의 전체 크기와 할당하려는 데이터 크기의 차가 16보다 크면
-     * 데이터 크기가 최소인 경우 블록 할당이 가능하므로 공간을 분리한다 */
-    if ((csize - asize) >= (MINBLOCK)) {
+    if ((csize - asize) >= MINBLOCK){
         PUT(HDRP(bp), PACK(asize, 1));
         PUT(FTRP(bp), PACK(asize, 1));
         byeBlock(bp);
         bp = NEXT_BLKP(bp);
-        PUT(HDRP(bp), PACK(csize - asize, 0));
-        PUT(FTRP(bp), PACK(csize - asize, 0));
+        PUT(HDRP(bp), PACK((csize - asize), 0));
+        PUT(FTRP(bp), PACK((csize - asize), 0));
         coalesce(bp);
     }
-    /* 차이가 16보다 작으면 더블 워드 할당을 만족하기 위해 모든 공간을 사용해야 하므로 공간을 모두 채운다 */
-    else {
+
+    else{
         PUT(HDRP(bp), PACK(csize, 1));
         PUT(FTRP(bp), PACK(csize, 1));
         byeBlock(bp);
     }
 }
+
 void mm_free(void *bp)
 {
     if(!bp) return;
@@ -178,66 +156,51 @@ void mm_free(void *bp)
     /* 가용 공간을 만들어주고 앞 뒤 공간을 확인해서 합칠 수 있으면 합친다 */
     coalesce(bp);
 }
+
 static void *coalesce(void *bp)
 {
-    // 이전 블록 할당 여부, 다음 블록 할당 여부, 현재 블록의 크기 확인 */
-    // 루트가 있는 경우는 || PREV_BLKP(bp) == bp 를 추가해줘야함 
-    // 우린 루트 없으니까 ㄱㅊ 
-    // size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp))) || PREV_BLKP(bp) == bp;
     size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
     size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
     size_t size = GET_SIZE(HDRP(bp));
 
-    // case 1
-    // 둘다 할당이면 아무것도 안한다 
-    if(prev_alloc && next_alloc){                   
+    if (prev_alloc && next_alloc){
     }
 
-    //case 2
-    // 다음 블록이 가용 블록이면 다음 블록과 합친다 
-    else if (prev_alloc && !next_alloc) {          
+    else if (prev_alloc && !next_alloc){
         size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
         byeBlock(NEXT_BLKP(bp));
-        PUT(HDRP(bp), PACK(size, 0));      
+        PUT(HDRP(bp), PACK(size, 0));
         PUT(FTRP(bp), PACK(size, 0));
     }
-
-    // case 3
-    // 이전 블록이 가용 블록이면 이전 블록과 합친다 
-    else if (!prev_alloc && next_alloc) {          
-        size += GET_SIZE(HDRP(PREV_BLKP(bp)));
-        bp = PREV_BLKP(bp); // 이거 위치 조심 
+    else if (!prev_alloc && next_alloc){
+        size += GET_SIZE(FTRP(PREV_BLKP(bp)));
+        bp = PREV_BLKP(bp);
         byeBlock(bp);
         PUT(HDRP(bp), PACK(size, 0));
-        PUT(FTRP(bp), PACK(size, 0));            
+        PUT(FTRP(bp), PACK(size, 0));
     }
-
-    // case 4
-    // 이전 블록과 다음 블록이 가용블록이면 두 블록 모두와 합친다 
-    else {                                        
-        size += GET_SIZE(HDRP(PREV_BLKP(bp))) + GET_SIZE(HDRP(NEXT_BLKP(bp)));
-        byeBlock(PREV_BLKP(bp));
+    else{
+        size += GET_SIZE(HDRP(NEXT_BLKP(bp))) + GET_SIZE(FTRP(PREV_BLKP(bp)));
         byeBlock(NEXT_BLKP(bp));
-        bp = PREV_BLKP(bp); // 이거 위치 조심 
-        PUT(HDRP(bp), PACK(size, 0));               
-        PUT(FTRP(bp), PACK(size, 0));          
+        byeBlock(PREV_BLKP(bp));
+        bp = PREV_BLKP(bp);
+        PUT(HDRP(bp), PACK(size, 0));
+        PUT(FTRP(bp), PACK(size, 0));
     }
-
-    // 우리는 루트가 없으니까 free_listp가 가리키는 애를 갈아끼우기로 했음
-    // 가리키고 있는 애가 있을 때와 없을 때로 분기 
-    if (free_listp == NULL){ // 가리키고 있는 애 없을 때는 맨처음에 걍 넣음 
-        free_listp = bp;
+    // 이제 free_listp에 bp를 추가해줘야함 
+    // 혼자라면 (뒤가 없다면)
+    // 혼자가 아니라면
+    if (free_listp == NULL){
         PREDP(bp) = NULL;
         SUCCP(bp) = NULL;
-    }
-    else{ // 가리키고 있는 애 있을 때는 연결 상태 바꿔줘야지, 이거 순서 매우 중요함 ! (free listp 덮어쓰지 않도록)
-        SUCCP(bp) = free_listp;
-        PREDP(free_listp) = bp;
-        PREDP(bp) = NULL;
         free_listp = bp;
     }
-    // 위의 if, else문에서 중복되는 부분 밖으로 꺼내도 됨 
-    // 지금은 이해 잘하기 위해 다 씀 
+    else{
+        PREDP(bp) = NULL;
+        SUCCP(bp) = free_listp;
+        PREDP(free_listp) = bp;
+        free_listp = bp;
+    }
     return bp;
 }
 
@@ -276,12 +239,17 @@ void *mm_realloc(void *ptr, size_t size)
 }
 
 static void byeBlock(void *bp){
-    if(PREDP(bp) == NULL){
+    if (PREDP(bp) == NULL){
         free_listp = SUCCP(bp);
     }
     else{
         SUCCP(PREDP(bp)) = SUCCP(bp);
     }
-    if(SUCCP(bp) != NULL)
+    if (SUCCP(bp) != NULL){
         PREDP(SUCCP(bp)) = PREDP(bp);
+
+    }
 }
+
+
+//2

@@ -106,7 +106,7 @@ static void *extend_heap(size_t words){
 
     // 요청 크기를 인접 2워드의 배수로 반올림 (홀수면 하나 큰거, 짝수면 그대로)
     // 그 후 sbrk 이용하여 메모리 시스템으로부터 추가적인 힙 공간 요청 
-    size = (words % 2) ? ((words + 1) * WSIZE) : (words * WSIZE);
+    size = (words % 2) ? ((words + 1) * WSIZE) : (words * WSIZE); // 있으나 마나 ㅇㅇ 
     if ((long)(bp = mem_sbrk(size)) == -1){
         return NULL;
     }
@@ -324,7 +324,7 @@ static void *find_fit(size_t asize){
 
     // // next fit
     char *bp = next_ptr;
-    for(; GET_SIZE(HDRP(next_ptr)) > 0; next_ptr = NEXT_BLKP(next_ptr)){
+    for(next_ptr = next_ptr; GET_SIZE(HDRP(next_ptr)) > 0; next_ptr = NEXT_BLKP(next_ptr)){
         if (!GET_ALLOC(HDRP(next_ptr)) && (asize <= GET_SIZE(HDRP(next_ptr)))){
             return next_ptr;
         }
