@@ -44,9 +44,7 @@ static void place(void *bp, size_t asize);
 static void byeBlock(void *bp);
 void* heap_listp;           /* 힙의 맨 처음 위치를 가리키고 있는 포인터, find_fit을 하는 시작점이 된다*/
 void* free_listp;           /* 가용 블록의 시작 위치를 가리키고 있는 포인터 */
-#ifdef NEXT_FIT
-void* next_fitp;           /* Next_fit 사용 시 탐색 시작 위치를 지정할 포인터 */
-#endif 
+
 // CLEAR
 int mm_init(void)
 {
@@ -252,4 +250,3 @@ static void byeBlock(void *bp){
 }
 
 
-//2

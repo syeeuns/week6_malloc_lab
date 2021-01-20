@@ -154,8 +154,7 @@ static void *coalesce(void *bp){
     else if(prev_alloc && !next_alloc){
         size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
         PUT(HDRP(bp), PACK(size, 0));
-        PUT(FTRP(bp), PACK(size, 0));  // 이 부분이 이해가 안감 PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0)); 이거 아닌가 
-        // 위 주석 답변 : FTRP는 HDRP 이용해서 구하는거니까 위에서 PUT(HDRP 어쩌구) 했으니까 자동으로 FTRP는 ㅇㅇ
+        PUT(FTRP(bp), PACK(size, 0));  // FTRP는 HDRP 이용해서 구하는거니까 위에서 PUT(HDRP(bp), PACK(size, 0)); 했으니까 자동으로 FTRP는 ㅇㅇ
     }
     // case 3
     // 이전 블럭 가용, 다음 블럭 할당 -> 이전 블럭과 병합
@@ -219,16 +218,7 @@ void *mm_malloc(size_t size) // 넘겨받는 인자의 크기 size만큼 메모�
     }
     place(bp, asize); // 요청한 블록을 이 새 가용 블록에 배치, 옵션으로 초과부분 분할
     return bp; // 새로 할당한 블록 반환
-    // int newsize = ALIGN(size + SIZE_T_SIZE); // 넘겨받는 인자 size 정렬
-    // void *p = mem_sbrk(newsize); // 위에서 정렬한 값을 이용하여 mem_sbrk 호출, 힙 크기 늘려줌 
-    // if (p == (void *)-1)
-    //     return NULL;
-    // else
-    // {
-    //     *(size_t *)p = size;
-    //     return (void *)((char *)p + SIZE_T_SIZE); // mem_sbrk에서 반환되는 포인터에 SIZE_T_SIZE 만큼 증가시킴 
-    //     // 크기 정보를 저장하는 부분을 SIZE_PTR(p)을 이용하여 구하고, 그곳에 size를 저장
-    // }
+
 }
 
 /*
@@ -264,19 +254,7 @@ void *mm_realloc(void *ptr, size_t size)
     memcpy(newptr, ptr, oldsize);
     mm_free(ptr);
     return newptr;
-    // void *oldptr = ptr;
-    // void *newptr;
-    // size_t copySize;
 
-    // newptr = mm_malloc(size);
-    // if (newptr == NULL)  
-    //     return NULL;
-    // copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
-    // if (size < copySize)
-    //     copySize = size;
-    // memcpy(newptr, oldptr, copySize);
-    // mm_free(oldptr);
-    // return newptr;
 }
 
 // 이 함수는 요청한 블록을 가용 블록의 시작 부분에 배치하고, 나머지 부분의 크기가 최소 블록의 크기와 같거나 큰 경우에만 분할
@@ -302,6 +280,7 @@ static void place(void *bp, size_t asize){
 
 // First fit 이용 fit 찾는 함수 
 // first fit은 처음부터 검색하면서 해당 size 블록 찾는 방법
+// next fit은 이전 검색한 부분부터 찾는 방법
 static void *find_fit(size_t asize){
     // // first fit (for)
     // void *bp;
